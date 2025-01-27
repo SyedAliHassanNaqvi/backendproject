@@ -67,7 +67,7 @@ const userSchema = new Schema(
 //save parmeter is used to perform a function just before saving the program
 userSchema.pre("save",async function (next){
   if (!this.isModified("pasword")) return next(); 
-  this.password = bcrypt.hash(this.password,10)
+  this.password =await bcrypt.hash(this.password,10)
   next()
 })
 
