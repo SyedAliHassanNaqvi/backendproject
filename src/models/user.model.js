@@ -19,7 +19,7 @@ const userSchema = new Schema(
       trim:true,
       index: true,
     },
-    username:{
+    email:{
       type: String,
       required:true,
       unique:true,
@@ -66,7 +66,7 @@ const userSchema = new Schema(
 //isModified is a built in function
 //save parmeter is used to perform a function just before saving the program
 userSchema.pre("save",async function (next){
-  if (!this.isModified("pasword")) return next(); 
+  if (!this.isModified("password")) return next(); 
   this.password =await bcrypt.hash(this.password,10)
   next()
 })

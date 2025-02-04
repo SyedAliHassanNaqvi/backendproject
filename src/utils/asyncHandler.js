@@ -7,7 +7,7 @@ const asyncHandler = (requestHandler)=>{
 }
 export  {asyncHandler};
 // TRY CATCH BASED
-// wo functions jo k function ko as a parameter bhi accept krskty hain ya phir usko return kr skty hain. Insted of this (fn)=>{} "bcz {} means callback" we'll write (fn)=>()=>{} this is same as (fn)=>{()=>{} }
+// higher order wo functions jo k function ko as a parameter bhi accept krskty hain ya phir usko return kr skty hain. Insted of this (fn)=>{} "bcz {} means callback" we'll write (fn)=>()=>{} this is same as (fn)=>{()=>{} }
 //we'll extract req,res from the function"fn" we passed and also next cz we can use sort of middlewares anytime
 
 //if the user passes the error code we'll simply use err.code to get it otherwise we'll simple use default code 500
