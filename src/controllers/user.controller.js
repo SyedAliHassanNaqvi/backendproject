@@ -1,7 +1,7 @@
 import {asyncHandler} from "../utils/asyncHandler.js";
 import  {ApiError}  from "../utils/ApiError.js"
 import { User } from "../models/user.model.js"
-import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import { uploadOnCloudinary,deleteFromCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 
@@ -298,6 +298,12 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
     throw new ApiError(400, "Error while uplaoding avatar on cloudinary ")
   }
 
+  //delete old avatarimage
+  const oldAvatar= await User.findById(req.user._id)
+  if(oldAvatar?.avatar){
+    await deleteFromCloudinary(oldAvatar.avatar)
+  }
+
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -323,6 +329,12 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
 
   if(!coverImage.url){
     throw new ApiError(400, "Error while uplaoding coverImage on cloudinary ")
+  }
+
+  //delete old coverImage
+  const oldCover= await User.findById(req.user._id)
+  if(oldCover?.coverImage){
+    await deleteFromCloudinary(oldCover.coverImage)
   }
 
   const user = await User.findByIdAndUpdate(
