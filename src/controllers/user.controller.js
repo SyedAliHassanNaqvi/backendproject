@@ -352,4 +352,82 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
   )
 })
 
-export {registerUser, loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserAvatar,updateUserCoverImage }; 
+const getUserChannelProfile = asyncHandler(async(req,res)=>{
+  const {username} = req.params
+  if(!username?.trim()){
+    throw new ApiError(400, "Username is missing")
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match:{
+        username: username?.toLowerCase
+      }
+    },
+    //id aur channel jin jin k same hongy un k pooray doc ko user mein enter kra rha lookup.Because jin jin k channel mmein user hai wohi tou usky subscribers
+    {
+      $lookup:{
+        from:"subscriptions", //db mein model lower case aur plural hojata // look from this model
+        localField: "_id",
+        foreignField:"channel",
+        as: "subscribers"
+      }
+    },
+    //jin jin k subscriber mein user hai wohi tou user k subscribedTo hain
+    {
+      $lookup:{
+        from:"subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as:"SubscribedTo"
+      }
+    },
+    {//to add new fields
+      $addFields:{
+        subscrbersCount:{
+          //to find no. of docs of subscrbers to get subscribers we use $size
+          $size : "$subscribers"
+        },
+        channelsSubscrbedToCount:{
+          //to find no. of docs of subscrbers to get subscribers we use $size
+          $size : "$subscribedTo"
+        },
+        isSubscribed:{
+          $cond:{
+            if:{$in:[req.user?._id, "$subscribers.subscriber"]},
+            then:true,
+            else:false
+          }
+        }
+        
+      }
+    },
+    //$project jin jin cheezon ko project krana ya show krana un k liay use hota
+    {
+      $project:{
+        fullName:1,
+        username:1,
+        subscrbersCount:1,
+        channelsSubscrbedToCount:1,
+        isSubscribed:1,
+        avatar:1,
+        coverImage:1,
+        email:1,
+
+
+      }
+    }
+  ])
+//No, it won't work the same way if we remove .length. The .length property specifically checks the length of the channel variable. If you remove .length, the check will only determine whether channel is null or undefined, but it won't check if channel is an empty array or string.
+  if(!channel?.length){
+    throw new ApiError(401,"Channel does not exist")
+  }
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(200,channel,"Channel fetched successfully")
+  )
+})
+
+export {registerUser, loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserAvatar,updateUserCoverImage,getUserChannelProfile }; 
