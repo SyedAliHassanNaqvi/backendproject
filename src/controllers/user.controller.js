@@ -357,7 +357,7 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
   if(!username?.trim()){
     throw new ApiError(400, "Username is missing")
   }
-
+//The $match stage filters the User collection to find the document for the specific user based on req.user._id.
   const channel = await User.aggregate([
     {
       $match:{
@@ -430,4 +430,59 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
   )
 })
 
-export {registerUser, loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserAvatar,updateUserCoverImage,getUserChannelProfile }; 
+//aggregation pipeline code does'nt go through mongoose, it goes directly.
+//the _id in mongodb and mongoose are different mongodb stores _id in ObjectId('679a5dd821a2570b3af8a442') this format while mongoose automatically converts the id into mongodb object id format and since aggregation pipeline code doesnt go through mongoose so problem occurs if we do _id: req.user._id in match directly. because req.user._id gives us string and through mongoose it gets converted to the mongoDb id. So we'll create mongoose Object id manually to match db using new mongoose.Type.ObjectId(req.user._id)
+const getWatchHistory = asyncHandler(async(req, res)=>{
+  const user = await User.aggregate([
+    {
+      $match:{
+        _id: new mongoose.Types.ObjectId(req.user._id)
+      }
+    },
+    {
+      $lookup:{//: The $lookup stage joins the User document with the videos collection. It matches the watchHistory array in the User document (which contains video _id values) with the _id field in the videos collection.
+        from : "videos" ,//model ka first letter small aur plural hojayega
+        localField: "watchHistory",
+        foreignField: "_id",//id is automatically generated that's why there's no id in video model
+        as:"watchHistory",
+        //to write nested aggregation pipelines we use "pipeline:" keyword
+        pipeline:[
+          {
+            $lookup:{
+              from:"users",
+              localField: "owner",
+              foreignField: "_id",
+              as:"owner",
+              //for displaying limited attributes of owner we'll again use pipeline
+              pipeline:[
+                {
+                  $project:{
+                    fullName:1,
+                    username:1,
+                    avatar:1,
+                  }
+                },
+                // for frontend ease we'll create/overwrite the owner object whose first element we'll give everything as object coz after lookuup we get array and we've to get the first value from array for this problem:(optional)
+                {
+                  $addFields:{
+                    owner:{
+                      $first:"$owner"
+                    }
+                  }
+                }
+                
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ])
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(200,user[0].watchHistory,"Watch History fetched succesfully")
+  )
+})
+
+export {registerUser, loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserAvatar,updateUserCoverImage,getUserChannelProfile,getWatchHistory }; 
