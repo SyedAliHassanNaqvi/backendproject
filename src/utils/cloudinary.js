@@ -35,4 +35,4 @@ const deleteFromCloudinary = async (oldAvatarpath)=>{
   }
 }
 
-export {uploadOnCloudinary}
+export {uploadOnCloudinary,deleteFromCloudinary}

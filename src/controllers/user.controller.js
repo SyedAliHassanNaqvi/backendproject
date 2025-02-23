@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import {asyncHandler} from "../utils/asyncHandler.js";
 import  {ApiError}  from "../utils/ApiError.js"
 import { User } from "../models/user.model.js"
@@ -170,8 +171,8 @@ const logoutUser = asyncHandler (async(req,res)=>{
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set:{
-        refreshToken: undefined
+      $unset:{
+        refreshToken: 1,
       }
     },
     {
@@ -261,7 +262,7 @@ const getCurrentUser = asyncHandler ( async (req,res) =>{
   return res
   .status(200)
   .json(
-    ApiResponse(200,req.user,"Current user fetched successfully")
+    new ApiResponse(200,req.user,"Current user fetched successfully")
   )
 })
 
@@ -361,7 +362,7 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
   const channel = await User.aggregate([
     {
       $match:{
-        username: username?.toLowerCase
+        username: username?.toLowerCase()
       }
     },
     //id aur channel jin jin k same hongy un k pooray doc ko user mein enter kra rha lookup.Because jin jin k channel mmein user hai wohi tou usky subscribers
@@ -379,7 +380,7 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
         from:"subscriptions",
         localField: "_id",
         foreignField: "subscriber",
-        as:"SubscribedTo"
+        as:"subscribedTo"
       }
     },
     {//to add new fields
