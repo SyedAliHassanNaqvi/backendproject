@@ -1,6 +1,8 @@
 import mongoose,{Schema} from "mongoose";
 //we installed npm install mongoose-aggregate-paginate-v2
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
+//we can't send all the videos to the user we've to give pagination like the user can load more videos or can show on the next page
+
 const videoSchema = new Schema(
   {
     videoFile:{
