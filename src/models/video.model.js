@@ -3,6 +3,7 @@ import mongoose,{Schema} from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 //we can't send all the videos to the user we've to give pagination like the user can load more videos or can show on the next page
 
+
 const videoSchema = new Schema(
   {
     videoFile:{
@@ -36,7 +37,7 @@ const videoSchema = new Schema(
 
     },
     owner:{
-      type: SchemaType.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User"
     }
   },
