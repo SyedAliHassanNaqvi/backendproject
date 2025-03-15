@@ -6,17 +6,139 @@ import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {uploadOnCloudinary,deleteFromCloudinary} from "../utils/cloudinary.js"
 
+const getSearchResults = asyncHandler(async (req, res) => {
+    const { query, page = 1, limit = 10 } = req.query;
+
+    if (!query) {
+        throw new ApiError(400, "Search query is required!");
+    }
+
+    // Pagination settings
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+    };
+
+    // Search for videos by title
+    const videoAggregation = Video.aggregate([
+        { 
+            $match: { 
+                title: { $regex: query, $options: "i" }, 
+                isPublished: true 
+            } 
+        },
+        { $sort: { views: -1, createdAt: -1 } },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+            },
+        },
+        { $unwind: "$owner" },
+        {
+            $project: {
+                _id: 1,
+                title: 1,
+                description: 1,
+                thumbnail: 1,
+                videoFile: 1,
+                duration: 1,
+                views: 1,
+                createdAt: 1,
+                owner: {
+                    _id: 1,
+                    name: 1,
+                    avatar: 1,
+                },
+            },
+        },
+    ]);
+
+    // Search for channels (users) by username or full name
+    const userAggregation = User.aggregate([
+        {
+            $match: {
+                $or: [
+                    { username: { $regex: query, $options: "i" } },
+                    { name: { $regex: query, $options: "i" } },
+                ],
+            },
+        },
+        {
+            $project: {
+                _id: 1,
+                username: 1,
+                name: 1,
+                avatar: 1,
+            },
+        },
+    ]);
+
+    // Execute both searches in parallel
+    const [videos, users] = await Promise.all([
+        Video.aggregatePaginate(videoAggregation, options),
+        User.aggregatePaginate(userAggregation, options),
+    ]);
+
+    return res.json(new ApiResponse(200, { videos, users }, "Search results retrieved successfully"));
+});
+
+// New function to get recommended videos without authentication
+const getRecommendedVideos = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+
+    // Define the aggregation pipeline for public videos only
+    const aggregation = Video.aggregate([
+        { $match: { isPublished: true } }, // Only return published videos
+        { $sort: { views: -1, createdAt: -1 } }, // Sort by popularity (views) and then by date
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+            },
+        },
+        { $unwind: "$owner" },
+        {
+            $project: {
+                videoFile: 1,
+                thumbnail: 1,
+                title: 1,
+                description: 1,
+                duration: 1,
+                views: 1,
+                createdAt: 1,
+                owner: {
+                    _id: 1,
+                    name: 1,
+                    avatar: 1
+                },
+            },
+        },
+    ]);
+
+    // Apply pagination
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+    };
+
+    const videos = await Video.aggregatePaginate(aggregation, options);
+
+    return res.json(new ApiResponse(200, videos, "Recommended videos retrieved successfully"));
+});
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, userId } = req.query;
+    const { page = 1, limit = 10, query } = req.query;
+    const userId = req.user._id; // Get the logged-in user's ID
 
     // Create a filter object for the aggregation
-    const matchStage = {};
+    const matchStage = { owner: new mongoose.Types.ObjectId(userId) }; // Filter by owner ID
     if (query) {
         matchStage.title = { $regex: query, $options: "i" }; // Case-insensitive title search
-    }
-    if (userId) {
-        matchStage.owner = new mongoose.Types.ObjectId(userId); // Filter by owner ID
     }
 
     // Define the aggregation pipeline
@@ -46,6 +168,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
                     _id: 1,
                     name: 1,
                     email: 1,
+                    avatar: 1,
                 },
             },
         },
@@ -59,7 +182,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
     const videos = await Video.aggregatePaginate(aggregation, options);
 
-    return res.json(new ApiResponse(200, videos, "Videos retrieved successfully"));
+    return res.json(new ApiResponse(200, videos, "User's videos retrieved successfully"));
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -110,7 +233,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     }
 
     // Find the video by ID
-    const video = await Video.findById(videoId).populate("owner"); // Populate owner details
+    const video = await Video.findById(videoId).populate("owner","name avatar email"); // Populate owner details
 
     if (!video) {
         throw new ApiError(404, "Video not found!");
@@ -197,5 +320,6 @@ export {
     getVideoById,
     updateVideo,
     deleteVideo,
-    togglePublishStatus
+    togglePublishStatus,
+    getRecommendedVideos,getSearchResults
 }
