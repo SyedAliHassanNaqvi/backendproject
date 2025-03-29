@@ -50,7 +50,7 @@ export const getSearchResults = async (req, res) => {
       let videoSort = sort === "date" ? { createdAt: -1 } : sort === "views" ? { views: -1 } : { score: -1, createdAt: -1 };
 
       if (sort === "relevance") {
-        const matchingVideos = await Video.find(videoQuery).populate("owner", "username avatar").limit(50);
+        const matchingVideos = await Video.find(videoQuery).populate("owner", "username fullName avatar").limit(50);
 
         const scoredVideos = matchingVideos.map(video => {
           let score = 0;
