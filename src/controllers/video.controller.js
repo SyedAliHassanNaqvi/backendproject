@@ -88,7 +88,6 @@ const getSearchResults = asyncHandler(async (req, res) => {
     return res.json(new ApiResponse(200, { videos, users }, "Search results retrieved successfully"));
 });
 
-// New function to get recommended videos without authentication
 const getRecommendedVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
 
@@ -104,7 +103,7 @@ const getRecommendedVideos = asyncHandler(async (req, res) => {
                 as: "owner",
             },
         },
-        { $unwind: "$owner" },
+        { $unwind: "$owner" }, // Convert owner array into an object
         {
             $project: {
                 videoFile: 1,
@@ -116,8 +115,8 @@ const getRecommendedVideos = asyncHandler(async (req, res) => {
                 createdAt: 1,
                 owner: {
                     _id: 1,
-                    name: 1,
-                    avatar: 1
+                    fullName: 1,  // Populating fullName
+                    avatar: 1     // Populating avatar
                 },
             },
         },
@@ -133,6 +132,7 @@ const getRecommendedVideos = asyncHandler(async (req, res) => {
 
     return res.json(new ApiResponse(200, videos, "Recommended videos retrieved successfully"));
 });
+
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query } = req.query;
