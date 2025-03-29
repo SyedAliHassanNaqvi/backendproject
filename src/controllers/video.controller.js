@@ -341,37 +341,39 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 
 const getVideosByUsername = async (req, res) => {
     try {
-      const { username } = req.params; // Get username from the route params
-      if (!username) {
-        return res.status(400).json({ message: "Username is required" });
-      }
-  
-      // Find the user by username and retrieve their ObjectId
-      const user = await User.findOne({ username });
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-  
-      // Fetch videos that belong to the user with the specified ObjectId
-      const userVideos = await Video.find({ owner: user._id }).sort({ createdAt: -1 }); // Sorting by creation date
-  
-      if (!userVideos || userVideos.length === 0) {
-        return res.status(404).json({ message: "No videos found for this user" });
-      }
-  
-      // Return the videos found
-      res.status(200).json({
-        data: {
-          docs: userVideos,
-          count: userVideos.length, // Return the count of videos for the user
+        const { username } = req.params; // Get username from the route params
+        if (!username) {
+            return res.status(400).json({ message: "Username is required" });
         }
-      });
+
+        // Find the user by username and retrieve their ObjectId
+        const user = await User.findOne({ username });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Fetch videos that belong to the user with the specified ObjectId and populate owner details
+        const userVideos = await Video.find({ owner: user._id })
+            .sort({ createdAt: -1 }) // Sorting by creation date
+            .populate("owner", "fullName avatar"); // Populating owner with fullName and avatar
+
+        if (!userVideos || userVideos.length === 0) {
+            return res.status(404).json({ message: "No videos found for this user" });
+        }
+
+        // Return the videos found
+        res.status(200).json({
+            data: {
+                docs: userVideos,
+                count: userVideos.length, // Return the count of videos for the user
+            }
+        });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Failed to fetch videos" });
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch videos" });
     }
-  };
+};
 
 
 export {
