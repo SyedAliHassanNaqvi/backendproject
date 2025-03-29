@@ -36,13 +36,14 @@ const getVideoComments = asyncHandler(async (req, res) => {
         {
             $project: {
                 _id: 1,
-                content: 1, // Ensure correct field name
+                content: 1, 
                 createdAt: 1,
                 "owner._id": 1,
-                "owner.name": 1, // Only return necessary user details
+                "owner.fullName": 1, // Change "name" to "fullName"
                 "owner.email": 1,
+                // Add any other needed fields
             },
-        },
+        }
     ];
 
     // Execute aggregate pagination

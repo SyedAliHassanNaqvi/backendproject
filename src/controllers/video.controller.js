@@ -5,6 +5,9 @@ import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {uploadOnCloudinary,deleteFromCloudinary} from "../utils/cloudinary.js"
+import {Like} from "../models/like.model.js"; // Adjust the path based on your folder structure
+import { Subscription } from "../models/subscription.model.js"
+
 
 const getSearchResults = asyncHandler(async (req, res) => {
     const { query, page = 1, limit = 10 } = req.query;
@@ -226,21 +229,44 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
+    const userId = req.user?._id; // Assuming authentication middleware is used
+    const { countView = "true" } = req.query; 
+   
 
-    // Check if videoId exists
-    if (!videoId) {
-        throw new ApiError(400, "Video ID is required!");
+    if (!mongoose.Types.ObjectId.isValid(videoId)) {
+        throw new ApiError(400, "Invalid Video ID format!");
     }
+    const updateOperation = countView === "true" 
+        ? { $inc: { views: 1 } } 
+        : {};
+    
 
-    // Find the video by ID
-    const video = await Video.findById(videoId).populate("owner","name avatar email"); // Populate owner details
+    const video = await Video.findByIdAndUpdate(
+        videoId,
+        updateOperation, 
+        { new: true }
+    ).populate("owner", "fullName avatar email").lean();
 
     if (!video) {
         throw new ApiError(404, "Video not found!");
     }
 
-    return res.status(200).json(new ApiResponse(200, { video }, "Got the video!"));
+    // Fetch likes count
+    const likesCount = await Like.countDocuments({ video: videoId });
+     // Fetch subscriber count for the video's owner
+     const subscriberCount = await Subscription.countDocuments({ channel: video.owner._id });
+
+    // Check if the user has liked this video
+    const userLike = await Like.findOne({ video: videoId, likedBy: userId });
+
+    // Attach likes and isLiked dynamically
+    video.likes = likesCount;
+    video.isLiked = !!userLike; // Convert to boolean
+
+    return res.status(200).json(new ApiResponse(200, { video,subscriberCount }, "Got the video!"));
 });
+
+
 
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -313,6 +339,40 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, video, "Video status changed successfully"));
 });
 
+const getVideosByUsername = async (req, res) => {
+    try {
+      const { username } = req.params; // Get username from the route params
+      if (!username) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+  
+      // Find the user by username and retrieve their ObjectId
+      const user = await User.findOne({ username });
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Fetch videos that belong to the user with the specified ObjectId
+      const userVideos = await Video.find({ owner: user._id }).sort({ createdAt: -1 }); // Sorting by creation date
+  
+      if (!userVideos || userVideos.length === 0) {
+        return res.status(404).json({ message: "No videos found for this user" });
+      }
+  
+      // Return the videos found
+      res.status(200).json({
+        data: {
+          docs: userVideos,
+          count: userVideos.length, // Return the count of videos for the user
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to fetch videos" });
+    }
+  };
+
 
 export {
     getAllVideos,
@@ -321,5 +381,5 @@ export {
     updateVideo,
     deleteVideo,
     togglePublishStatus,
-    getRecommendedVideos,getSearchResults
+    getRecommendedVideos,getSearchResults,getVideosByUsername
 }

@@ -17,11 +17,20 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 
     if (existingLike) {
         await existingLike.deleteOne();
-        return res.status(200).json(new ApiResponse(200, [], "Video unliked successfully"));
+    } else {
+        await Like.create({ video: videoId, likedBy });
     }
 
-    const newLike = await Like.create({ video: videoId, likedBy });
-    return res.status(201).json(new ApiResponse(201, newLike, "Video liked successfully"));
+    // Get updated like count after the like/unlike operation
+    const likesCount = await Like.countDocuments({ video: videoId });
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            { liked: !existingLike, likes: likesCount }, // Fix: return `likes` instead of `likesCount`
+            existingLike ? "Video unliked successfully" : "Video liked successfully"
+        )
+    );
 });
 
 // Toggle Like for Comment
@@ -34,14 +43,23 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     }
 
     const existingLike = await Like.findOne({ comment: commentId, likedBy });
+    let liked = false;
 
     if (existingLike) {
         await existingLike.deleteOne();
-        return res.status(200).json(new ApiResponse(200, [], "Comment unliked successfully"));
+        liked = false;
+    } else {
+        await Like.create({ comment: commentId, likedBy });
+        liked = true;
     }
 
-    const newLike = await Like.create({ comment: commentId, likedBy });
-    return res.status(201).json(new ApiResponse(201, newLike, "Comment liked successfully"));
+    // Get updated like count
+    const likesCount = await Like.countDocuments({ comment: commentId });
+
+    return res.status(200).json(
+        new ApiResponse(200, { liked, likesCount }, 
+        liked ? "Comment liked successfully" : "Comment unliked successfully")
+    );
 });
 
 // Get Liked Videos

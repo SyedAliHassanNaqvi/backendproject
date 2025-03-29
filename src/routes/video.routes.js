@@ -7,18 +7,25 @@ import {
     togglePublishStatus,
     updateVideo,
     getRecommendedVideos,
-    getSearchResults
+    getSearchResults,getVideosByUsername
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
+
 const router = Router();
+
+
+// Within your route definitions:
+router.get("/search", getSearchResults);
 
 // Public route for recommended videos - no authentication required
 router.route("/recommended").get(getRecommendedVideos);
 
 // Public search route for both videos & channels
 router.route("/search").get(getSearchResults);
+
+router.route("/user/:username").get(getVideosByUsername); // Public route to get videos uploaded by a user
 
 router.use(verifyJWT);
 
