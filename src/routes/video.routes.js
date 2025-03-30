@@ -27,7 +27,7 @@ router.route("/search").get(getSearchResults);
 
 router.route("/user/:username").get(getVideosByUsername); // Public route to get videos uploaded by a user
 
-router.use(verifyJWT);
+
 
 router
     .route("/")
@@ -43,9 +43,9 @@ router
 router
     .route("/:videoId")
     .get(getVideoById)
-    .delete(deleteVideo)
-    .patch(upload.single("thumbnail"), updateVideo);
+    .delete(verifyJWT,deleteVideo)
+    .patch(upload.single("thumbnail"),verifyJWT, updateVideo);
 
-router.route("/toggle/publish/:videoId").patch(togglePublishStatus);
+router.route("/toggle/publish/:videoId").patch(verifyJWT,togglePublishStatus);
 
 export default router;
