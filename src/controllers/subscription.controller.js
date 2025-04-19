@@ -29,7 +29,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     
     const subscribers = await Subscription
         .find({channel: channelId})
-        .populate("subscriber", "username")
+        .populate("subscriber", "username avatar")
     return res.status(200).json(new ApiResponse(200, subscribers, "Subscribers fetched successfully"))
 })
 
