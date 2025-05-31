@@ -1,40 +1,59 @@
 import { Router } from "express";
-import {logoutUser,loginUser,registerUser,refreshAccessToken, changeCurrentPassword, getCurrentUser,updateAccountDetails, updateUserAvatar, updateUserCoverImage, getUserChannelProfile, getWatchHistory} from "../controllers/user.controller.js"
-import { upload } from "../middlewares/multer.middleware.js"
-import { verifyJWT } from "../middlewares/auth.middleware.js"; // Ensure correct path
+import {
+  logoutUser,
+  loginUser,
+  registerUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+  updateUserCoverImage,
+  getUserChannelProfile,
+} from "../controllers/user.controller.js";
+import { upload } from "../middlewares/multer.middleware.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { authorizeRoles } from "../middlewares/role.middleware.js";
 
-//post will call the registerUser method on /register
 
-const router = Router(); 
-//in post there are two functions separated by comma, the first function is middleware
-//that's why we write next at the end of the middleware so that we can move to the 2nd function of post which is after comma like first fun in this is upload(which is a middleware) and second is registerUser
-router.route("/register").post(
+const router = Router();
+
+// ✅ Public User Registration
+router.post(
+  "/register",
   upload.fields([
-    {
-      name: "avatar",
-      maxCount: 1
-    },
-    {
-      name: "coverImage",
-      maxCount:1
-    }
+    { name: "avatar", maxCount: 1 },
+    { name: "coverImage", maxCount: 1 }
   ]),
-  registerUser)
+  registerUser
+);
 
-router.route("/login").post(loginUser)
+// ✅ Admin-Only User Registration
+router.post(
+  "/admin/register",
+  verifyJWT,         // Must be logged in
+  authorizeRoles("admin")
+,           // Must be an admin
+  upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "coverImage", maxCount: 1 }
+  ]),
+  registerUser
+);
 
-//secured routes
-router.route("/logout").post(verifyJWT,logoutUser)
-router.route("/refresh-token").post(refreshAccessToken)
-router.route("/change-password").post(verifyJWT,changeCurrentPassword)
-router.route("/current-user").get(verifyJWT,getCurrentUser) //we used get request because the user is not sending anything it's just recieving 
-router.route("/update-account").patch(verifyJWT,updateAccountDetails)
-router.route("/avatar").patch(verifyJWT,upload.single("avatar"),updateUserAvatar)
-router.route("/cover-image").patch(verifyJWT,upload.single("coverImage"),updateUserCoverImage)
-//cz of params we use /c/:
-router.route("/c/:username").get(getUserChannelProfile)
-router.route("/history").get(verifyJWT, getWatchHistory)
+// Login & Auth
+router.post("/login", loginUser);
+router.post("/refresh-token", refreshAccessToken);
+router.post("/logout", verifyJWT, logoutUser);
+router.post("/change-password", verifyJWT, changeCurrentPassword);
+router.get("/current-user", verifyJWT, getCurrentUser);
 
+// Profile Update
+router.patch("/update-account", verifyJWT, updateAccountDetails);
+router.patch("/avatar", verifyJWT, upload.single("avatar"), updateUserAvatar);
+router.patch("/cover-image", verifyJWT, upload.single("coverImage"), updateUserCoverImage);
 
+// Public User Profile
+router.get("/c/:username", getUserChannelProfile);
 
 export default router;

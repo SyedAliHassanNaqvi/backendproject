@@ -27,88 +27,72 @@ const generateAccesAndRefreshTokens = async (userId) =>{
 }
 
 
-const registerUser = asyncHandler (async (req, res)=>{
-  // get user details from frontend
-  // validation - not empty
-  // check if user already exists: username,email
-  // check for images, check for avatar
-  // upload them to cloudinary,avatar 
-  // create user object - create entry in db
-  // remove password and refresh token firled from the reponse
-  // check for user creation
-  // return response
+const registerUser = asyncHandler(async (req, res) => {
+  const { fullName, email, password, username, role } = req.body;
 
-  const {fullName, email, password, username}=req.body
-  //Extracts the fullName property from req.body and assigns it to the variable fullName.
-  //Extracts the email property from req.body and assigns it to the variable email.
-  //Extracts the password property from req.body and assigns it to the variable password.
-  //Extracts the username property from req.body and assigns it to the variable username.
-  //console.log("email", email);
-  // The some() method executes the callback function once for each array element.
-  // after some we can also write some.((field)=>field?.trim() === "" return true})
-  //means if the field will be empty even after whitespaces removed then it will return true
-  if(
-    [fullName, email, password, username].some((field)=> field?.trim() === "")
-  ){
-    throw new ApiError(400, "All fields are required")
+  if ([fullName, email, password, username].some((field) => field?.trim() === "")) {
+    throw new ApiError(400, "All fields are required");
   }
-  //$or means we'll add OR between every element in the array
-  //User contacts the DB to find the required fields
+
   const existedUser = await User.findOne({
-    $or: [{email},{username}]
-  })
-  if(existedUser){
-    throw new ApiError (409, "User with email or username exists")
-  }
-  //console.log(req.files)
-  // middleware req k ander aur fields add krta req k aagy multer is providing us the .files field
-  //[0] means first property wwhich will give us the path.path will gives us the path where the multer stored the file, [0] means first property wwhich will give us the path
-  const avatarLocalPath = req.files?.avatar?.length > 0 ? req.files.avatar[0].path : null;
-if (!avatarLocalPath) {
-  throw new ApiError(400, "Avatar file is required!");
-}
+    $or: [{ email }, { username }],
+  });
 
-  //const coverImageLocalPath=req.files?.coverImage[0]?.path
-  //below code is for handling if the cover image is not provided
+  if (existedUser) {
+    throw new ApiError(409, "User with email or username already exists");
+  }
+
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is required!");
+  }
+
   let coverImageLocalPath;
-  if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0){
-    coverImageLocalPath = req.files.coverImage[0].path
+  if (req.files?.coverImage?.length > 0) {
+    coverImageLocalPath = req.files.coverImage[0].path;
   }
 
-  //upload on cloudinary
-  const avatar=await uploadOnCloudinary(avatarLocalPath)
-  const coverImage=await uploadOnCloudinary(coverImageLocalPath)
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if(!avatar){
-    throw new ApiError(400, "avatar file is required")
+  if (!avatar) {
+    throw new ApiError(400, "Avatar upload failed");
   }
-  //mostly User talks to the DB
-  //create user in db
+
+  // Determine role: only admin can assign roles like "admin" or "official"
+  let finalRole = "citizen"; // default role
+
+  // If user is authenticated and admin (e.g., via req.user middleware)
+  if (req.user && req.user.role === "admin" && role?.trim()) {
+    const allowedRoles = ["admin", "official", "citizen"];
+    if (allowedRoles.includes(role.trim().toLowerCase())) {
+      finalRole = role.trim().toLowerCase();
+    }
+  }
+
   const user = await User.create({
     fullName,
     avatar: avatar.url,
-    coverImage:coverImage?.url || "",
+    coverImage: coverImage?.url || "",
     email,
     password,
-    username: username.toLowerCase()  
-  })
-  //check user creation by id
-  //mongoDB automatically creates _id for the new entry
-  //.select is used to remove password & refreshToken
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  )
+    username: username.toLowerCase(),
+    role: finalRole,
+  });
 
-  if(!createdUser){
-    throw new ApiError(500, "Something went wrong while registering the user")
+  const createdUser = await User.findById(user._id).select("-password -refreshToken");
+
+  if (!createdUser) {
+    throw new ApiError(500, "Something went wrong while registering the user");
   }
 
   return res.status(201).json({
-    message: new ApiResponse(200, createdUser, "User registered Successfully")
+    message: new ApiResponse(200, createdUser, "User registered successfully"),
   });
-  
+});
+//Only an admin user (based on req.user.role === "admin") can assign roles like "admin" or "official".
 
-})
+//If a regular unauthenticated or non-admin user registers, their role defaults to "citizen" — ignoring any manually set value from frontend.
 
 const loginUser = asyncHandler (async (req,res)=>{
   // req body -> data
@@ -433,57 +417,6 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
 
 //aggregation pipeline code does'nt go through mongoose, it goes directly.
 //the _id in mongodb and mongoose are different mongodb stores _id in ObjectId('679a5dd821a2570b3af8a442') this format while mongoose automatically converts the id into mongodb object id format and since aggregation pipeline code doesnt go through mongoose so problem occurs if we do _id: req.user._id in match directly. because req.user._id gives us string and through mongoose it gets converted to the mongoDb id. So we'll create mongoose Object id manually to match db using new mongoose.Type.ObjectId(req.user._id)
-const getWatchHistory = asyncHandler(async(req, res)=>{
-  const user = await User.aggregate([
-    {
-      $match:{
-        _id: new mongoose.Types.ObjectId(req.user._id)
-      }
-    },
-    {
-      $lookup:{//: The $lookup stage joins the User document with the videos collection. It matches the watchHistory array in the User document (which contains video _id values) with the _id field in the videos collection.
-        from : "videos" ,//model ka first letter small aur plural hojayega
-        localField: "watchHistory",
-        foreignField: "_id",//id is automatically generated that's why there's no id in video model
-        as:"watchHistory",
-        //to write nested aggregation pipelines we use "pipeline:" keyword
-        pipeline:[
-          {
-            $lookup:{
-              from:"users",
-              localField: "owner",
-              foreignField: "_id",
-              as:"owner",
-              //for displaying limited attributes of owner we'll again use pipeline
-              pipeline:[
-                {
-                  $project:{
-                    fullName:1,
-                    username:1,
-                    avatar:1,
-                  }
-                },
-                // for frontend ease we'll create/overwrite the owner object whose first element we'll give everything as object coz after lookuup we get array and we've to get the first value from array for this problem:(optional)
-                {
-                  $addFields:{
-                    owner:{
-                      $first:"$owner"
-                    }
-                  }
-                }
-                
-              ]
-            }
-          }
-        ]
-      }
-    }
-  ])
-  return res
-  .status(200)
-  .json(
-    new ApiResponse(200,user[0].watchHistory,"Watch History fetched succesfully")
-  )
-})
 
-export {registerUser, loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserAvatar,updateUserCoverImage,getUserChannelProfile,getWatchHistory,updateAccountDetails }; 
+
+export {registerUser, loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateUserAvatar,updateUserCoverImage,getUserChannelProfile,updateAccountDetails }; 
